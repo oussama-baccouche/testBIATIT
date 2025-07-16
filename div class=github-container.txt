@@ -1,0 +1,355 @@
+<div class="github-profile-container">
+  <!-- Loading State with Skeleton Screens -->
+  <ng-container *ngIf="isLoading; else content">
+    <div class="skeleton-loading">
+      <div class="skeleton-avatar"></div>
+      <div class="skeleton-info">
+        <div class="skeleton-line long"></div>
+        <div class="skeleton-line medium"></div>
+        <div class="skeleton-line short"></div>
+      </div>
+      <div class="skeleton-nav"></div>
+      <div class="skeleton-repos">
+        <div class="skeleton-repo" *ngFor="let item of [1,2,3]"></div>
+      </div>
+    </div>
+  </ng-container>
+
+  <ng-template #content>
+    <!-- Error Message -->
+    <div *ngIf="errorMessage" @fadeIn class="error-message">
+      <i class="pi pi-exclamation-circle"></i>
+      {{ errorMessage }}
+      <button class="retry-btn" (click)="retryLoadData()">Retry</button>
+    </div>
+
+    <!-- Profile Content -->
+    <div *ngIf="userInfo" @fadeIn class="profile-content">
+      <!-- Profile Header with Pinned Repositories -->
+      <div class="profile-header">
+        <div class="avatar-container">
+          <img [src]="userInfo.avatar_url" alt="Avatar" class="avatar" [class.avatar-animate]="avatarLoaded"
+            (load)="avatarLoaded = true">
+
+          <div *ngIf="userInfo.hireable" class="hireable-badge">
+            <i class="pi pi-briefcase"></i> Available for hire
+          </div>
+        </div>
+
+        <div class="profile-info">
+          <div class="name-section">
+            <h1 class="profile-name">
+              {{ userInfo.name || userInfo.login }}
+              <span *ngIf="userInfo.name" class="profile-username">{{ userInfo.login }}</span>
+            </h1>
+            <button *ngIf="!isFollowing" class="follow-btn" (click)="followUser()">
+              <i class="pi pi-user-plus"></i> Follow
+            </button>
+            <button *ngIf="isFollowing" class="following-btn" (click)="unfollowUser()">
+              <i class="pi pi-user-check"></i> Following
+            </button>
+          </div>
+
+          <p *ngIf="userInfo.bio" class="profile-bio">{{ userInfo.bio }}</p>
+
+          <div class="profile-meta">
+            <span *ngIf="userInfo.company" class="meta-item">
+              <i class="pi pi-building"></i>
+              {{ userInfo.company }}
+            </span>
+            <span *ngIf="userInfo.location" class="meta-item">
+              <i class="pi pi-map-marker"></i>
+              {{ userInfo.location }}
+            </span>
+            <span *ngIf="userInfo.email" class="meta-item">
+              <i class="pi pi-envelope"></i>
+              {{ userInfo.email }}
+            </span>
+            <span *ngIf="userInfo.blog" class="meta-item">
+              <i class="pi pi-link"></i>
+              <a [href]="userInfo.blog | urlFormatter" target="_blank">{{ userInfo.blog | urlFormatter }}</a>
+            </span>
+            <span class="meta-item">
+              <i class="pi pi-users"></i>
+              {{ userInfo.followers | number }} followers · {{ userInfo.following | number }} following
+            </span>
+            <span class="meta-item">
+              <i class="pi pi-calendar"></i>
+              Joined {{ userInfo.created_at | date: 'MMM d, y' }}
+            </span>
+          </div>
+
+          <div *ngIf="organizations.length > 0" class="organizations">
+            <h3 class="org-title">Organizations</h3>
+            <div class="org-list">
+              <a *ngFor="let org of organizations" [href]="org.html_url" target="_blank">
+                <img [src]="org.avatar_url" [alt]="org.login" class="org-avatar">
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pinned Repositories -->
+      <div *ngIf="pinnedRepos.length > 0" class="pinned-repos">
+        <h2 class="section-title">
+          <i class="pi pi-thumbtack"></i> Pinned Repositories
+        </h2>
+        <div class="pinned-grid">
+          <div *ngFor="let repo of pinnedRepos" @staggerAnimation class="pinned-repo">
+            <div class="pinned-repo-header">
+              <a [href]="repo.html_url" target="_blank" class="repo-name">
+                <i class="pi pi-book"></i>
+                {{ repo.name }}
+              </a>
+              <span class="repo-badge" [ngClass]="repo.private ? 'private' : 'public'"
+                [matTooltip]="repo.private ? 'Private repository' : 'Public repository'">
+                <i class="pi" [ngClass]="repo.private ? 'pi-lock' : 'pi-globe'"></i>
+                {{ repo.private ? 'Private' : 'Public' }}
+              </span>
+            </div>
+            <p *ngIf="repo.description" class="repo-description">{{ repo.description }}</p>
+            <div class="repo-meta">
+              <span *ngIf="repo.language" class="meta-item">
+                <span class="language-color" [style.background-color]="repo.language_color || '#ccc'"></span>
+                {{ repo.language }}
+              </span>
+              <span *ngIf="repo.stargazers_count > 0" class="meta-item">
+                <i class="pi pi-star"></i>
+                {{ repo.stargazers_count | number }}
+              </span>
+              <span *ngIf="repo.forks_count > 0" class="meta-item">
+                <i class="pi pi-share-alt"></i>
+                {{ repo.forks_count | number }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Profile Navigation -->
+      <nav class="profile-nav">
+        <ul>
+          <li [class.active]="activeTab === 'repositories'">
+            <a (click)="setActiveTab('repositories')">
+              <i class="pi pi-book"></i> Repositories <span class="count">{{ userRepos.length | number }}</span>
+            </a>
+          </li>
+          <li [class.active]="activeTab === 'stars'">
+            <a (click)="setActiveTab('stars')">
+              <i class="pi pi-star"></i> Stars <span class="count">{{ starredRepos.length | number }}</span>
+            </a>
+          </li>
+          <li [class.active]="activeTab === 'projects'">
+            <a (click)="setActiveTab('projects')">
+              <i class="pi pi-share-alt"></i> Projects
+            </a>
+          </li>
+          <li [class.active]="activeTab === 'packages'">
+            <a (click)="setActiveTab('packages')">
+              <i class="pi pi-box"></i> Packages
+            </a>
+          </li>
+        </ul>
+      </nav>
+
+      <!-- Beautiful Description Card -->
+      <div class="profile-description-card" @fadeIn>
+        <i class="pi pi-info-circle info-icon"></i>
+        <div class="description-content">
+          <h2>Welcome to your GitHub Dashboard</h2>
+          <p>
+            Here you can explore your repositories, starred projects, organizations, and contribution activity. Use the
+            filters and actions to manage your projects and share your work with others!
+          </p>
+        </div>
+      </div>
+
+      <!-- Tab Content -->
+      <div class="tab-content">
+        <!-- Repositories Tab -->
+        <div *ngIf="activeTab === 'repositories'" @tabAnimation class="repositories-container">
+          <div class="repositories-header">
+            <div class="search-box">
+              <input type="text" placeholder="Find a repository..." class="search-input" [(ngModel)]="repoSearchQuery"
+                (input)="filterRepos()">
+              <select class="repo-filter" [(ngModel)]="repoFilterType" (change)="filterRepos()">
+                <option value="all">All</option>
+                <option value="sources">Sources</option>
+                <option value="forks">Forks</option>
+                <option value="archived">Archived</option>
+                <option value="mirrors">Mirrors</option>
+              </select>
+              <select class="repo-sort" [(ngModel)]="repoSortOption" (change)="sortRepos()">
+                <option value="updated">Last updated</option>
+                <option value="name">Name</option>
+                <option value="stars">Stars</option>
+              </select>
+            </div>
+            <div class="repo-actions">
+              <button *ngIf="!isAdminView" class="btn btn-sm btn-primary new-repo-btn" (click)="openAddRepoModal()">
+                <i class="pi pi-plus-circle"></i> New repository
+              </button>
+            </div>
+          </div>
+
+          <div class="repositories-list">
+            <div *ngFor="let repo of filteredRepos" @staggerAnimation class="repo-card">
+              <div class="repo-header">
+                <a [href]="repo.html_url" target="_blank" class="repo-name">
+                  <i class="pi pi-book"></i>
+                  {{ repo.name }}
+                </a>
+                <div class="repo-actions">
+                  <span class="repo-badge" [ngClass]="repo.private ? 'private' : 'public'"
+                    [matTooltip]="repo.private ? 'Private repository' : 'Public repository'">
+                    <i class="pi" [ngClass]="repo.private ? 'pi-lock' : 'pi-globe'"></i>
+                    {{ repo.private ? 'Private' : 'Public' }}
+                  </span>
+                  <button class="star-btn" (click)="toggleStar(repo)">
+                    <i class="pi pi-star"></i> Star
+                  </button>
+                  <button class="share-btn" (click)="copyRepoUrl(repo.html_url)">
+                    <i class="pi pi-share-alt"></i> Share
+                  </button>
+                </div>
+              </div>
+
+              <p *ngIf="repo.description" class="repo-description">{{ repo.description }}</p>
+
+              <div class="repo-meta">
+                <span *ngIf="repo.language" class="meta-item">
+                  <span class="language-color" [style.background-color]="repo.language_color || '#ccc'"></span>
+                  {{ repo.language }}
+                </span>
+                <span *ngIf="repo.stargazers_count > 0" class="meta-item">
+                  <i class="pi pi-star"></i>
+                  {{ repo.stargazers_count | number }}
+                </span>
+                <span *ngIf="repo.forks_count > 0" class="meta-item">
+                  <i class="pi pi-share-alt"></i>
+                  {{ repo.forks_count | number }}
+                </span>
+                <span *ngIf="repo.updated_at" class="meta-item">
+                  Updated {{ repo.updated_at | timeAgo }}
+                </span>
+                <span *ngIf="repo.license" class="meta-item">
+                  <i class="pi pi-file"></i>
+                  {{ repo.license.spdx_id || repo.license.name }}
+                </span>
+              </div>
+              <button [routerLink]="['/repos', repo.owner.login, repo.name, 'contents' , ]" class="btn btn-link">
+                display content
+              </button>
+            </div>
+
+            <div *ngIf="filteredRepos.length === 0" class="empty-repos">
+              <i class="pi pi-book"></i>
+              <p>No repositories found</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stars Tab -->
+        <div *ngIf="activeTab === 'stars'" @tabAnimation class="stars-container">
+          <div class="stars-header">
+            <h3>{{ starredRepos.length | number }} starred repositories</h3>
+            <div class="search-box">
+              <input type="text" placeholder="Filter starred repositories..." class="search-input"
+                [(ngModel)]="starSearchQuery" (input)="filterStarredRepos()">
+            </div>
+          </div>
+
+          <div class="stars-list">
+            <div *ngFor="let repo of filteredStarredRepos" @staggerAnimation class="star-card">
+              <div class="star-header">
+                <a [href]="repo.html_url" target="_blank" class="repo-name">
+                  <i class="pi pi-book"></i>
+                  {{ repo.full_name }}
+                </a>
+                <button class="unstar-btn" (click)="unstarRepo(repo)">
+                  <i class="pi pi-star-fill"></i> Unstar
+                </button>
+              </div>
+
+              <p *ngIf="repo.description" class="repo-description">{{ repo.description }}</p>
+
+              <div class="repo-meta">
+                <span *ngIf="repo.language" class="meta-item">
+                  <span class="language-color" [style.background-color]="repo.language_color || '#ccc'"></span>
+                  {{ repo.language }}
+                </span>
+                <span *ngIf="repo.stargazers_count > 0" class="meta-item">
+                  <i class="pi pi-star"></i>
+                  {{ repo.stargazers_count | number }}
+                </span>
+                <span *ngIf="repo.forks_count > 0" class="meta-item">
+                  <i class="pi pi-share-alt"></i>
+                  {{ repo.forks_count | number }}
+                </span>
+                <span *ngIf="repo.updated_at" class="meta-item">
+                  Updated {{ repo.updated_at | timeAgo }}
+                </span>
+              </div>
+            </div>
+
+            <div *ngIf="filteredStarredRepos.length === 0" class="empty-stars">
+              <i class="pi pi-star"></i>
+              <p>No starred repositories found</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Projects Tab -->
+        <div *ngIf="activeTab === 'projects'" @tabAnimation class="projects-container">
+          <div class="empty-projects">
+            <i class="pi pi-share-alt"></i>
+            <h3>Projects</h3>
+            <p>Projects let you organize your work into boards</p>
+            <button class="btn btn-primary">New project</button>
+          </div>
+        </div>
+
+        <!-- Packages Tab -->
+        <div *ngIf="activeTab === 'packages'" @tabAnimation class="packages-container">
+          <div class="empty-packages">
+            <i class="pi pi-box"></i>
+            <h3>Packages</h3>
+            <p>Publish packages you want to share with others</p>
+            <button class="btn btn-primary">New package</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Contribution Graph -->
+      <div *ngIf="contributionsData" class="contribution-graph">
+        <h2 class="section-title">
+          <i class="pi pi-chart-bar"></i> Contribution Activity
+        </h2>
+        <div class="graph-container">
+          <div class="graph">
+            <div *ngFor="let week of contributionsData.weeks" class="graph-week">
+              <div *ngFor="let day of week.contributionDays" class="graph-day"
+                [style.background-color]="getContributionColor(day.contributionCount)"
+                [matTooltip]="day.contributionCount + ' contributions on ' + (day.date | date: 'fullDate')">
+              </div>
+            </div>
+          </div>
+          <div class="graph-legend">
+            <span>Less</span>
+            <div class="legend-day" *ngFor="let color of contributionColors"></div>
+            <span>More</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </ng-template>
+
+  <div class="modal-backdrop" *ngIf="showAddRepoModal" (click)="closeAddRepoModal()"></div>
+  <div class="modal-wrapper" *ngIf="showAddRepoModal">
+    <app-add-repo (repoCreated)="onRepoCreated()" (click)="$event.stopPropagation()"></app-add-repo>
+    <button class="modal-close" (click)="closeAddRepoModal()">
+      <i class="pi pi-times"></i>
+    </button>
+  </div>
+</div>
